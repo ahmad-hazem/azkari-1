@@ -1,4 +1,4 @@
-name: Build Android AAB
+name: Build Signed Android AAB
 
 on:
   workflow_dispatch:
@@ -22,11 +22,65 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
 
+      - name: Create Release Keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore android/app/upload-keystore.jks \
+            -storetype JKS \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias upload \
+            -storepass "AzKari2026@Upload" \
+            -keypass "AzKari2026@Upload" \
+            -dname "CN=AzKari, OU=Mobile, O=AzKari, L=Gaza, ST=Gaza, C=PS"
+
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=AzKari2026@Upload
+          keyPassword=AzKari2026@Upload
+          keyAlias=upload
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Configure Release Signing
+        run: |
+          python3 - <<'PY'
+          p = "android/app/build.gradle.kts"
+          s = open(p).read()
+
+          s = s.replace(
+              'ndkVersion = "27.0.12077973"',
+              'ndkVersion = "27.0.12077973"\n\n    signingConfigs {\n        create("release") {\n            storeFile = file("upload-keystore.jks")\n            storePassword = "AzKari2026@Upload"\n            keyAlias = "upload"\n            keyPassword = "AzKari2026@Upload"\n        }\n    }'
+          )
+
+          s = s.replace(
+              'signingConfig = signingConfigs.getByName("debug")',
+              'signingConfig = signingConfigs.getByName("release")'
+          )
+
+          open(p, "w").write(s)
+          PY
+
+          cp android/app/upload-keystore.jks android/app/
+
       - name: Build Release AAB
         run: flutter build appbundle --release
+
+      - name: Verify AAB Signature
+        run: |
+          jarsigner -verify -verbose -certs build/app/outputs/bundle/release/app-release.aab
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: android-release-aab
           path: build/app/outputs/bundle/release/*.aab
+
+      - name: Upload Keystore
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-keystore-backup
+          path: android/app/upload-keystore.jks
