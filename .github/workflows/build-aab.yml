@@ -36,36 +36,6 @@ jobs:
             -keypass "AzKari2026@Upload" \
             -dname "CN=AzKari, OU=Mobile, O=AzKari, L=Gaza, ST=Gaza, C=PS"
 
-      - name: Create key.properties
-        run: |
-          cat > android/key.properties <<EOF
-          storePassword=AzKari2026@Upload
-          keyPassword=AzKari2026@Upload
-          keyAlias=upload
-          storeFile=upload-keystore.jks
-          EOF
-
-      - name: Configure Release Signing
-        run: |
-          python3 - <<'PY'
-          p = "android/app/build.gradle.kts"
-          s = open(p).read()
-
-          s = s.replace(
-              'ndkVersion = "27.0.12077973"',
-              'ndkVersion = "27.0.12077973"\n\n    signingConfigs {\n        create("release") {\n            storeFile = file("upload-keystore.jks")\n            storePassword = "AzKari2026@Upload"\n            keyAlias = "upload"\n            keyPassword = "AzKari2026@Upload"\n        }\n    }'
-          )
-
-          s = s.replace(
-              'signingConfig = signingConfigs.getByName("debug")',
-              'signingConfig = signingConfigs.getByName("release")'
-          )
-
-          open(p, "w").write(s)
-          PY
-
-          
-
       - name: Build Release AAB
         run: flutter build appbundle --release
 
@@ -79,7 +49,7 @@ jobs:
           name: android-release-aab
           path: build/app/outputs/bundle/release/*.aab
 
-      - name: Upload Keystore
+      - name: Upload Keystore Backup
         uses: actions/upload-artifact@v4
         with:
           name: upload-keystore-backup
