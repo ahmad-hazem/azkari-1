@@ -64,7 +64,7 @@ jobs:
           open(p, "w").write(s)
           PY
 
-          cp android/app/upload-keystore.jks android/app/
+          
 
       - name: Build Release AAB
         run: flutter build appbundle --release
