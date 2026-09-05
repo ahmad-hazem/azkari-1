@@ -1,0 +1,41 @@
+name: Export PEM Certificate
+
+on:
+  workflow_dispatch:
+    inputs:
+      store_password:
+        description: 'Keystore Password'
+        required: true
+        default: 'android'
+      key_alias:
+        description: 'Key Alias'
+        required: true
+        default: 'upload'
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > upload-keystore.jks
+
+      - name: Export PEM
+        run: |
+          keytool -export -rfc \
+            -alias "${{ github.event.inputs.key_alias }}" \
+            -file upload_certificate.pem \
+            -keystore upload-keystore.jks \
+            -storepass "${{ github.event.inputs.store_password }}"
+
+      - name: Upload PEM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-pem-certificate
+          path: upload_certificate.pem
