@@ -1,10 +1,10 @@
-name: Export PEM Certificate
+name: Generate Permanent Keystore and PEM
 
 on:
   workflow_dispatch:
 
 jobs:
-  export:
+  generate:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Java
@@ -13,49 +13,46 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > upload-keystore.jks
-          ls -lh upload-keystore.jks
-
-      - name: Diagnose Passwords and Export
+      - name: Generate Keystore
         env:
-          MY_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          # List of candidate passwords to test
-          PASSWORDS=("$MY_PASS" "android" "123456" "password" "sobhati" "azkari")
-          FOUND_PASS=""
+          keytool -genkeypair -v \
+            -keystore permanent-upload-keystore.jks \
+            -alias upload \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "$KEY_PASS" \
+            -keypass "$KEY_PASS" \
+            -dname "CN=Ahmed, OU=Mobile, O=Azkari, L=Palestine, ST=Gaza, C=PS"
 
-          for p in "${PASSWORDS[@]}"; do
-            if [ -n "$p" ]; then
-              if keytool -list -keystore upload-keystore.jks -storepass "$p" > /dev/null 2>&1; then
-                FOUND_PASS="$p"
-                echo "SUCCESS: Keystore unlocked successfully!"
-                break
-              fi
-            fi
-          done
-
-          if [ -z "$FOUND_PASS" ]; then
-            echo "FAILED: None of the standard passwords unlocked this keystore file."
-            exit 1
-          fi
-
-          echo "Extracting details..."
-          keytool -list -v -keystore upload-keystore.jks -storepass "$FOUND_PASS"
-
-          ALIAS_NAME=$(keytool -list -keystore upload-keystore.jks -storepass "$FOUND_PASS" | grep -E "Entry type|PrivateKeyEntry" -B 1 | head -n 1 | awk -F',' '{print $1}' | xargs)
-          echo "Alias identified: $ALIAS_NAME"
-
+      - name: Export PEM Certificate
+        env:
+          KEY_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
           keytool -export -rfc \
-            -alias "$ALIAS_NAME" \
+            -alias upload \
             -file upload_certificate.pem \
-            -keystore upload-keystore.jks \
-            -storepass "$FOUND_PASS"
+            -keystore permanent-upload-keystore.jks \
+            -storepass "$KEY_PASS"
 
-      - name: Upload PEM Artifact
-        if: always()
+      - name: Display SHA-1 Fingerprint
+        env:
+          KEY_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          echo "=== YOUR NEW PERMANENT SHA-1 ==="
+          keytool -list -v -keystore permanent-upload-keystore.jks -storepass "$KEY_PASS" | grep "SHA1:"
+
+      - name: Encode Keystore to Base64
+        run: |
+          base64 -w 0 permanent-upload-keystore.jks > keystore_base64.txt
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: upload-pem-certificate
-          path: upload_certificate.pem
+          name: permanent-key-and-pem
+          path: |
+            permanent-upload-keystore.jks
+            upload_certificate.pem
+            keystore_base64.txt
