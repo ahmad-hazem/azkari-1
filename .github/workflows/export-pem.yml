@@ -6,11 +6,6 @@ on:
       store_password:
         description: 'Keystore Password'
         required: true
-        default: 'android'
-      key_alias:
-        description: 'Key Alias'
-        required: true
-        default: 'upload'
 
 jobs:
   export:
@@ -24,17 +19,27 @@ jobs:
 
       - name: Decode Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > upload-keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > upload-keystore.jks
+          ls -lh upload-keystore.jks
 
-      - name: Export PEM
+      - name: Inspect and Export
         run: |
+          echo "Listing keystore content to find alias..."
+          keytool -list -v -keystore upload-keystore.jks -storepass "${{ github.event.inputs.store_password }}"
+
+          # Extract alias name automatically
+          ALIAS_NAME=$(keytool -list -keystore upload-keystore.jks -storepass "${{ github.event.inputs.store_password }}" | grep -E "Entry type|PrivateKeyEntry" -B 1 | head -n 1 | awk -F',' '{print $1}')
+          echo "Found Alias: $ALIAS_NAME"
+
+          # Export PEM using the auto-detected alias
           keytool -export -rfc \
-            -alias "${{ github.event.inputs.key_alias }}" \
+            -alias "$ALIAS_NAME" \
             -file upload_certificate.pem \
             -keystore upload-keystore.jks \
             -storepass "${{ github.event.inputs.store_password }}"
 
       - name: Upload PEM Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: upload-pem-certificate
