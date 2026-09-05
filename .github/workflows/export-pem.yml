@@ -2,10 +2,6 @@ name: Export PEM Certificate
 
 on:
   workflow_dispatch:
-    inputs:
-      store_password:
-        description: 'Keystore Password'
-        required: true
 
 jobs:
   export:
@@ -20,23 +16,24 @@ jobs:
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > upload-keystore.jks
-          ls -lh upload-keystore.jks
 
       - name: Inspect and Export
+        env:
+          STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          echo "Listing keystore content to find alias..."
-          keytool -list -v -keystore upload-keystore.jks -storepass "${{ github.event.inputs.store_password }}"
+          echo "Listing keystore entries using secure environment variable..."
+          keytool -list -v -keystore upload-keystore.jks -storepass "$STORE_PASS"
 
           # Extract alias name automatically
-          ALIAS_NAME=$(keytool -list -keystore upload-keystore.jks -storepass "${{ github.event.inputs.store_password }}" | grep -E "Entry type|PrivateKeyEntry" -B 1 | head -n 1 | awk -F',' '{print $1}')
+          ALIAS_NAME=$(keytool -list -keystore upload-keystore.jks -storepass "$STORE_PASS" | grep -E "Entry type|PrivateKeyEntry" -B 1 | head -n 1 | awk -F',' '{print $1}' | xargs)
           echo "Found Alias: $ALIAS_NAME"
 
-          # Export PEM using the auto-detected alias
+          # Export PEM certificate
           keytool -export -rfc \
             -alias "$ALIAS_NAME" \
             -file upload_certificate.pem \
             -keystore upload-keystore.jks \
-            -storepass "${{ github.event.inputs.store_password }}"
+            -storepass "$STORE_PASS"
 
       - name: Upload PEM Artifact
         if: always()
