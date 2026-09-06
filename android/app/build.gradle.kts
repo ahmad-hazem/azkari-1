@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.ahmed.azkari"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     signingConfigs {
@@ -30,9 +30,9 @@ android {
     defaultConfig {
         applicationId = "com.ahmed.azkari"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        targetSdk = 36
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     buildTypes {
