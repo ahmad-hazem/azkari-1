@@ -1,56 +1,42 @@
-name: Build Signed Android AAB
+name: Build and Sign AAB
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.24.x' # أو الإصدار الذي تستخدمه
+          channel: 'stable'
+          cache: true
 
-      - name: Flutter Pub Get
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > android/app/upload-keystore.jks
+          ls -lh android/app/upload-keystore.jks
+
+      - name: Install Dependencies
         run: flutter pub get
 
-      - name: Create Release Keystore
-        run: |
-          keytool -genkeypair \
-            -v \
-            -keystore android/app/upload-keystore.jks \
-            -storetype JKS \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -alias upload \
-            -storepass "AzKari2026@Upload" \
-            -keypass "AzKari2026@Upload" \
-            -dname "CN=AzKari, OU=Mobile, O=AzKari, L=Gaza, ST=Gaza, C=PS"
-
-      - name: Build Release AAB
+      - name: Build AAB
         run: flutter build appbundle --release
 
-      - name: Verify AAB Signature
-        run: |
-          jarsigner -verify -verbose -certs build/app/outputs/bundle/release/app-release.aab
-
-      - name: Upload AAB
+      - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-release-aab
+          name: app-release-aab
           path: build/app/outputs/bundle/release/*.aab
-
-      - name: Upload Keystore Backup
-        uses: actions/upload-artifact@v4
-        with:
-          name: upload-keystore-backup
-          path: android/app/upload-keystore.jks
