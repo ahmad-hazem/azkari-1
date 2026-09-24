@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ==========================================
@@ -172,6 +173,7 @@ late StorageService storage;
 // ==========================================
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ar', null);
   final prefs = await SharedPreferences.getInstance();
   storage = StorageService(prefs);
   runApp(const SobhatiApp());
